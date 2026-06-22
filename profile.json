@@ -1,20 +1,134 @@
 {
-  "skills": [],
-  "titles": [
-    "Software Engineer",
-    "Full Stack Developer",
-    "Frontend Developer"
+  "skills": [
+    {
+      "name": "Excel",
+      "tier": "core"
+    },
+    {
+      "name": "Power BI",
+      "tier": "peripheral"
+    },
+    {
+      "name": "Tableau",
+      "tier": "peripheral"
+    },
+    {
+      "name": "SQL",
+      "tier": "strong"
+    },
+    {
+      "name": "Xplan",
+      "tier": "core"
+    },
+    {
+      "name": "HUB24",
+      "tier": "core"
+    },
+    {
+      "name": "CFS Edge",
+      "tier": "core"
+    },
+    {
+      "name": "Macquarie Platform",
+      "tier": "strong"
+    },
+    {
+      "name": "Data Visualization",
+      "tier": "strong"
+    },
+    {
+      "name": "Financial Analysis",
+      "tier": "strong"
+    },
+    {
+      "name": "Business Analytics",
+      "tier": "strong"
+    },
+    {
+      "name": "SAP",
+      "tier": "peripheral"
+    },
+    {
+      "name": "PowerPoint",
+      "tier": "core"
+    }
   ],
-  "keywords": [],
+  "titles": [
+    "Paraplanner",
+    "Client Service Officer (Financial Planning)",
+    "Business Analyst",
+    "Associate Adviser",
+    "Advice Associate",
+    "Superannuation Operations Officer",
+    "Platform Operations Officer",
+    "Investment Administration Officer",
+    "Fund Administration Officer",
+    "Client Operations Specialist",
+    "Data Analyst",
+    "Reporting Analyst",
+    "Operations Analyst",
+    "Supply Chain Analyst",
+    "Supply Chain Coordinator",
+    "Procurement Analyst",
+    "Sourcing Analyst",
+    "Inventory Analyst",
+    "Inventory Planner",
+    "Demand Planner",
+    "Supply Planner",
+    "Logistics Coordinator",
+    "Operations Coordinator",
+    "Risk & Compliance Analyst",
+    "Financial Analyst",
+    "Graduate"
+  ],
+  "keywords": [
+    "excel",
+    "power bi",
+    "tableau",
+    "sql",
+    "xplan",
+    "hub24",
+    "cfs edge",
+    "macquarie platform",
+    "data visualization",
+    "financial analysis",
+    "business analytics",
+    "sap",
+    "powerpoint",
+    "financial planning",
+    "superannuation",
+    "wealth",
+    "wrap",
+    "investment operations",
+    "member services",
+    "unit registry",
+    "client service",
+    "client operations",
+    "supply chain",
+    "procurement",
+    "sourcing",
+    "logistics"
+  ],
   "locations": [
-    "Adelaide",
     "Sydney",
-    "Melbourne"
+    "NSW",
+    "New South Wales",
+    "Australia",
+    "Remote",
+    "Hybrid"
   ],
   "roles": [
-    "Software Engineer",
-    "Full Stack Developer",
-    "Frontend Developer"
+    "Paraplanner",
+    "Client Service Officer",
+    "Business Analyst",
+    "Associate Adviser",
+    "Operations Officer",
+    "Operations Analyst",
+    "Financial Analyst",
+    "Supply Chain Analyst",
+    "Planner",
+    "Coordinator",
+    "Graduate"
   ],
   "weights": {
     "companyTier": 1,
@@ -32,8 +146,19 @@
   "excludeSeniority": [
     "senior",
     "lead",
-    "staff",
+    "principal",
+    "head of",
+    "manager",
     "director",
-    "executive"
+    "engineer",
+    "developer",
+    "devops",
+    "nurse",
+    "sales representative",
+    "warehouse",
+    "driver",
+    "forklift",
+    "storeperson",
+    "picker"
   ]
 }
