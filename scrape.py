@@ -24,20 +24,35 @@ from pathlib import Path
 
 import pandas as pd
 import os
+import requests
 from jobspy import scrape_jobs
 
 from scrapers_au import close_seek_browser, scrape_au_sites, scrape_gradconnection, scrape_prosple
 
-# Fetch your proxy from the environment variable
-proxy = os.environ.get("PROXY_URL") 
-proxies = [proxy] if proxy else None
+def get_free_proxies():
+    """Fetches the latest free proxies from ProxyScrape's live CDN mirror"""
+    url = "https://cdn.jsdelivr.net/gh/proxyscrape/free-proxy-list@main/proxies/all/data.txt"
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            # Split the text by newlines and remove any empty lines
+            proxy_list = [line.strip() for line in response.text.strip().split('\n') if line.strip()]
+            print(f"Successfully loaded {len(proxy_list)} free proxies.")
+            return proxy_list
+    except Exception as e:
+        print(f"Failed to fetch proxy list: {e}")
+    return None
 
+# Fetch the proxies
+proxies = get_free_proxies()
+
+# Execute JobSpy scrape
 jobs = scrape_jobs(
     site_name=["seek", "linkedin"],
     search_term="software engineer",
     location="Sydney, Australia",
     results_wanted=20,
-    proxies=proxies # Pass the proxy array here
+    proxies=proxies # Pass the full parsed list here
 )
 
 # Suppress noisy JobSpy/tls_client logs
