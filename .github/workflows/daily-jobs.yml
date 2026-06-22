@@ -52,6 +52,9 @@ jobs:
             exit 1
           fi
 
+      - name: Enable unprivileged user namespaces
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 
+
       - name: Run scraper
         env:
           CHROME_BINARY: /usr/bin/google-chrome-stable
