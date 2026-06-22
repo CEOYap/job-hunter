@@ -1,0 +1,39 @@
+{
+  "skills": [],
+  "titles": [
+    "Software Engineer",
+    "Full Stack Developer",
+    "Frontend Developer"
+  ],
+  "keywords": [],
+  "locations": [
+    "Adelaide",
+    "Sydney",
+    "Melbourne"
+  ],
+  "roles": [
+    "Software Engineer",
+    "Full Stack Developer",
+    "Frontend Developer"
+  ],
+  "weights": {
+    "companyTier": 1,
+    "location": 1,
+    "titleMatch": 1,
+    "skills": 1,
+    "sponsorship": 1,
+    "recency": 1,
+    "culture": 1,
+    "quality": 1
+  },
+  "minScore": 20,
+  "maxHours": 24,
+  "resultsPerSearch": 20,
+  "excludeSeniority": [
+    "senior",
+    "lead",
+    "staff",
+    "director",
+    "executive"
+  ]
+}
