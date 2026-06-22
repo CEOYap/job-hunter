@@ -111,11 +111,7 @@
   ],
   "locations": [
     "Sydney",
-    "NSW",
-    "New South Wales",
-    "Australia",
-    "Remote",
-    "Hybrid"
+    "Australia"
   ],
   "roles": [
     "Paraplanner",
@@ -131,14 +127,14 @@
     "Graduate"
   ],
   "weights": {
-    "companyTier": 1,
-    "location": 1,
-    "titleMatch": 1,
-    "skills": 1,
-    "sponsorship": 1,
-    "recency": 1,
-    "culture": 1,
-    "quality": 1
+    "companyTier": 0.7,
+    "location": 1.0,
+    "titleMatch": 0.4,
+    "skills": 1.6,
+    "sponsorship": 1.0,
+    "recency": 1.2,
+    "culture": 0.5,
+    "quality": 1.0
   },
   "minScore": 20,
   "maxHours": 24,

@@ -179,13 +179,18 @@ async def _get_seek_page_async(url: str) -> str:
 
     if _seek_browser is None:
         try:
-            # Use CHROME_BINARY env var if set (e.g. Docker with Chromium)
+            # Use CHROME_BINARY env var if set (e.g. CI/Docker with Chromium)
             browser_path = os.environ.get("CHROME_BINARY")
-            kwargs = {"headless": False}
+            # sandbox=False is required when running as root (GitHub Actions /
+            # Docker) - without it nodriver fails with "Failed to connect to
+            # browser ... running as root". This also adds --no-sandbox.
+            kwargs = {
+                "headless": False,
+                "sandbox": False,
+                "browser_args": ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+            }
             if browser_path:
                 kwargs["browser_executable_path"] = browser_path
-                # Docker runs as root - Chrome needs --no-sandbox
-                kwargs["browser_args"] = ["--no-sandbox", "--disable-dev-shm-usage"]
             _seek_browser = await uc.start(**kwargs)
         except Exception as e:
             print(f"      Seek: Chrome not available ({e}), skipping")

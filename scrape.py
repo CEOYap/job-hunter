@@ -16,6 +16,7 @@ import argparse
 import csv
 import json
 import logging
+import os
 import re
 import sys
 import unicodedata
@@ -168,18 +169,85 @@ ROLE_SEARCHES = [
 ]
 
 
-def get_free_proxies():
-    """Fetches the latest free proxies from ProxyScrape's live CDN mirror"""
-    url = "https://cdn.jsdelivr.net/gh/proxyscrape/free-proxy-list@main/proxies/all/data.txt"
-    try:
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            # Split the text by newlines and remove any empty lines
-            proxy_list = [line.strip() for line in response.text.strip().split("\n") if line.strip()]
-            print(f"Successfully loaded {len(proxy_list)} free proxies.")
-            return proxy_list
-    except Exception as e:
-        print(f"Failed to fetch proxy list: {e}")
+# Hardcoded Webshare proxies in `ip:port:username:password` form (username-auth,
+# direct mode). Refresh these from the Webshare dashboard when the IPs/credentials
+# rotate. Two optional runtime overrides (no code change needed):
+#   WEBSHARE_PROXY_URL  - a live Webshare "Download" link to fetch the list from
+#   PROXY_FILE          - path to a downloaded proxy list file (default: proxies.txt)
+WEBSHARE_PROXIES = [
+    "31.59.20.176:6754:apenmkrw:94mg6oxy5luu",
+    "31.56.127.193:7684:apenmkrw:94mg6oxy5luu",
+    "45.38.107.97:6014:apenmkrw:94mg6oxy5luu",
+    "38.154.203.95:5863:apenmkrw:94mg6oxy5luu",
+    "198.105.121.200:6462:apenmkrw:94mg6oxy5luu",
+    "64.137.96.74:6641:apenmkrw:94mg6oxy5luu",
+    "198.23.243.226:6361:apenmkrw:94mg6oxy5luu",
+    "38.154.185.97:6370:apenmkrw:94mg6oxy5luu",
+    "142.111.67.146:5611:apenmkrw:94mg6oxy5luu",
+    "191.96.254.138:6185:apenmkrw:94mg6oxy5luu",
+]
+
+
+def _parse_proxy_lines(lines) -> list[str]:
+    """Convert Webshare `ip:port:user:pass` lines into requests/JobSpy `user:pass@ip:port`."""
+    proxies = []
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split(":")
+        if len(parts) == 4:
+            ip, port, user, password = parts
+            proxies.append(f"{user}:{password}@{ip}:{port}")
+        elif len(parts) == 2:
+            # Plain ip:port (IP-authorized proxies, no credentials)
+            proxies.append(line)
+        else:
+            print(f"  Skipping malformed proxy line: {line}")
+    return proxies
+
+
+def get_proxies() -> list[str] | None:
+    """Build the proxy list for scraping.
+
+    Source priority:
+      1. WEBSHARE_PROXY_URL env var (fetch a live Webshare download link)
+      2. PROXY_FILE on disk (default 'proxies.txt')
+      3. The hardcoded WEBSHARE_PROXIES list (always available, so CI never
+         depends on a live token)
+    Returns the proxy list, or None if nothing usable was found.
+    """
+    # 1. Optional live URL override
+    url = os.environ.get("WEBSHARE_PROXY_URL")
+    if url:
+        try:
+            response = requests.get(url, timeout=15)
+            body = response.text.strip()
+            # Webshare returns a JSON error body (HTTP 200) when the token is bad.
+            if response.status_code == 200 and not body.startswith(("{", "[")):
+                proxies = _parse_proxy_lines(body.split("\n"))
+                if proxies:
+                    print(f"Loaded {len(proxies)} proxies from WEBSHARE_PROXY_URL.")
+                    return proxies
+            print(f"WEBSHARE_PROXY_URL returned no usable proxies (HTTP {response.status_code}); falling back.")
+        except Exception as e:
+            print(f"WEBSHARE_PROXY_URL fetch failed ({e}); falling back.")
+
+    # 2. Optional file override
+    proxy_file = Path(os.environ.get("PROXY_FILE", "proxies.txt"))
+    if proxy_file.exists():
+        proxies = _parse_proxy_lines(proxy_file.read_text(encoding="utf-8").splitlines())
+        if proxies:
+            print(f"Loaded {len(proxies)} proxies from {proxy_file}.")
+            return proxies
+
+    # 3. Hardcoded fallback
+    proxies = _parse_proxy_lines(WEBSHARE_PROXIES)
+    if proxies:
+        print(f"Loaded {len(proxies)} hardcoded Webshare proxies.")
+        return proxies
+
+    print("No proxies available; scraping will use direct connections.")
     return None
 
 
@@ -343,9 +411,10 @@ SKILL_TIERS = {
     "prompt engineering": 1,
 }
 
-# ─── Negative Titles (FIX 6: penalize non-engineering roles) ────────────────
+# ─── Negative Titles (penalize roles outside the user's target domain) ──────
+# NOTE: "business analyst" and "procurement" are intentionally absent — they are
+# finance/supply-chain target roles for this profile, not roles to penalize.
 NEGATIVE_TITLE_PATTERNS = [
-    "business analyst",
     "project manager",
     "product manager",
     "it support",
@@ -364,7 +433,6 @@ NEGATIVE_TITLE_PATTERNS = [
     "desktop support",
     "account manager",
     "marketing",
-    "procurement",
 ]
 
 # ─── Visa/Sponsorship Signals (bonus for international students) ────────────
@@ -994,7 +1062,7 @@ def main():
     results_wanted = args.results if args.results is not None else profile_data["results_per_search"]
 
     # Fetch proxies dynamically during runtime execution
-    proxies = get_free_proxies()
+    proxies = get_proxies()
 
     defaults = {
         "sites": args.sites,
@@ -1031,12 +1099,25 @@ def main():
     jobs["tier"] = jobs["company"].apply(classify_company) if "company" in jobs.columns else ""
     jobs["seniority"] = jobs["title"].apply(detect_seniority) if "title" in jobs.columns else ""
     jobs["seniority"] = jobs["seniority"].replace("", "mid")
+
+    # Profile-driven scoring preferences: title scoring comes from the user's own
+    # role search terms (priority order → decreasing points), and location scoring
+    # from their target cities — instead of the hardcoded software/Adelaide defaults.
+    title_prefs = [{"term": role, "points": max(8, 18 - i)} for i, role in enumerate(profile_data["roles"])]
+    location_prefs = [
+        {"city": loc.split(",")[0].strip(), "points": 12}
+        for loc in profile_data["locations"]
+        if loc.split(",")[0].strip().lower() not in {"australia", "remote", "hybrid"}
+    ]
+
     jobs["score"] = jobs.apply(
         lambda row: score_job(
             row,
             profile,
             weights=profile_data["weights"],
             skill_tiers=profile_data["skill_tiers"],
+            title_prefs=title_prefs,
+            location_prefs=location_prefs,
         ),
         axis=1,
     )
