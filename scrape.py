@@ -23,37 +23,10 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
-import os
 import requests
 from jobspy import scrape_jobs
 
 from scrapers_au import close_seek_browser, scrape_au_sites, scrape_gradconnection, scrape_prosple
-
-def get_free_proxies():
-    """Fetches the latest free proxies from ProxyScrape's live CDN mirror"""
-    url = "https://cdn.jsdelivr.net/gh/proxyscrape/free-proxy-list@main/proxies/all/data.txt"
-    try:
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            # Split the text by newlines and remove any empty lines
-            proxy_list = [line.strip() for line in response.text.strip().split('\n') if line.strip()]
-            print(f"Successfully loaded {len(proxy_list)} free proxies.")
-            return proxy_list
-    except Exception as e:
-        print(f"Failed to fetch proxy list: {e}")
-    return None
-
-# Fetch the proxies
-proxies = get_free_proxies()
-
-# Execute JobSpy scrape
-jobs = scrape_jobs(
-    site_name=["seek", "linkedin"],
-    search_term="software engineer",
-    location="Sydney, Australia",
-    results_wanted=20,
-    proxies=proxies # Pass the full parsed list here
-)
 
 # Suppress noisy JobSpy/tls_client logs
 logging.getLogger("JobSpy").setLevel(logging.WARNING)
@@ -193,6 +166,21 @@ ROLE_SEARCHES = [
     "Web Developer",
     "AI Engineer",
 ]
+
+
+def get_free_proxies():
+    """Fetches the latest free proxies from ProxyScrape's live CDN mirror"""
+    url = "https://cdn.jsdelivr.net/gh/proxyscrape/free-proxy-list@main/proxies/all/data.txt"
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            # Split the text by newlines and remove any empty lines
+            proxy_list = [line.strip() for line in response.text.strip().split('\n') if line.strip()]
+            print(f"Successfully loaded {len(proxy_list)} free proxies.")
+            return proxy_list
+    except Exception as e:
+        print(f"Failed to fetch proxy list: {e}")
+    return None
 
 
 # ─── Profile Loader ──────────────────────────────────────────────────────────
@@ -470,19 +458,7 @@ def score_job(
     location_prefs: list = None,
     title_prefs: list = None,
 ) -> float:
-    """Score a job by relevance to the parsed resume profile.
-
-    Args:
-        weights: Optional dict with multipliers for scoring categories.
-            Keys: companyTier, location, titleMatch, skills, sponsorship, recency, culture, quality
-            Values: 0.0 to 2.0 (default 1.0 for all)
-        skill_tiers: Optional dict mapping skill names (lowercase) to point values.
-            Falls back to module-level SKILL_TIERS for CLI mode.
-        location_prefs: Optional list of {"city": str, "points": int} dicts.
-            Falls back to hardcoded Adelaide/Sydney/Melbourne for CLI mode.
-        title_prefs: Optional list of {"term": str, "points": int} dicts.
-            Falls back to hardcoded title_boosts for CLI mode.
-    """
+    """Score a job by relevance to the parsed resume profile."""
     w = weights or {}
     w_company = w.get("companyTier", 1.0)
     w_location = w.get("location", 1.0)
@@ -704,7 +680,6 @@ def _recency_score(date_str: str) -> float:
 
     today = datetime.now().date()
 
-    # Try ISO format first (2026-02-06)
     for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S.%fZ"):
         try:
             posted = datetime.strptime(date_str[:19], fmt[:19]).date()
@@ -723,7 +698,6 @@ def _recency_score(date_str: str) -> float:
         except ValueError:
             continue
 
-    # Try relative formats like "2d ago", "8d ago", "26d ago"
     m = re.match(r"(\d+)d?\s*ago", date_str.strip())
     if m:
         days_old = int(m.group(1))
@@ -761,12 +735,11 @@ def classify_company(company) -> str:
 
 # ─── Seniority Detection ─────────────────────────────────────────────────────
 
-# Patterns ordered from most to least senior.  First match wins.
 _SENIORITY_PATTERNS = [
     (r"\b(?:chief|cto|cio|vp|vice.?president)\b", "executive"),
     (r"\bdirector\b", "director"),
     (r"\b(?:staff|principal|distinguished)\b", "staff"),
-    (r"\bmid[- ]?(?:to[- ])?senior\b", "senior"),  # "Mid to Senior" before generic "senior"
+    (r"\bmid[- ]?(?:to[- ])?senior\b", "senior"),
     (r"\b(?:senior|sr\.?|snr)\b", "senior"),
     (r"\barchitect\b", "senior"),
     (r"\bmanager\b", "lead"),
@@ -791,9 +764,9 @@ def detect_seniority(title: str) -> str:
 
 def _normalize(text: str) -> str:
     """Lowercase, strip accents, collapse whitespace/punctuation for fuzzy matching."""
-    text = text.split("|")[0]  # strip suffixes like "| International Students"
+    text = text.split("|")[0]
     text = unicodedata.normalize("NFKD", text.lower())
-    text = text.encode("ascii", "ignore").decode()  # strip accents
+    text = text.encode("ascii", "ignore").decode()
     text = re.sub(r"[^a-z0-9 ]", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 
@@ -802,11 +775,9 @@ def deduplicate(df: pd.DataFrame) -> pd.DataFrame:
     """Remove duplicates: first by exact URL, then by normalized (title, company) pair."""
     before = len(df)
 
-    # Pass 1: exact URL dedup
     if "job_url" in df.columns:
         df = df.drop_duplicates(subset=["job_url"], keep="first")
 
-    # Pass 2: fuzzy title+company dedup (catches same job across sites)
     if "title" in df.columns and "company" in df.columns:
         norm_key = df["title"].fillna("").apply(_normalize) + "|" + df["company"].fillna("").apply(_normalize)
         df = df.loc[~norm_key.duplicated(keep="first")]
@@ -836,6 +807,10 @@ def run_search(search_term: str, location: str, defaults: dict) -> pd.DataFrame 
         "verbose": 0,
     }
 
+    # Inject free proxy fallback if present in execution defaults
+    if defaults.get("proxies"):
+        kwargs["proxies"] = defaults["proxies"]
+
     google_term = f"{search_term} jobs in {location.split(',')[0]} since yesterday"
     kwargs["google_search_term"] = google_term
 
@@ -856,25 +831,15 @@ def run_search(search_term: str, location: str, defaults: dict) -> pd.DataFrame 
 
 
 def scrape_all(locations: list[str], search_terms: list[str], defaults: dict) -> pd.DataFrame:
-    """Orchestrate all scrapers with smart dedup-aware scheduling.
-
-    Strategy - each source is called at the right granularity to avoid duplicates:
-      • Indeed (JobSpy):     per city × per term  (city-specific results)
-      • Seek:                per city × per term  (city-specific results)
-      • LinkedIn:            per city × per term  (city-specific, fetches descriptions)
-      • GradConnection:      once per city         (category-based, ignores search terms)
-      • Prosple:             once per search term   (national results, ignores city)
-    """
+    """Orchestrate all scrapers with smart dedup-aware scheduling."""
     all_dfs = []
     total = len(locations) * len(search_terms)
     i = 0
 
-    # ── Per-city sources ──────────────────────────────────────────────────
     for loc in locations:
         city = loc.split(",")[0]
         print(f"\n  [{city}]")
 
-        # GradConnection: once per city (ignores search terms)
         print("  GradConnection...", end="", flush=True)
         gc_jobs = scrape_gradconnection("", city)
         print(f" {len(gc_jobs)}")
@@ -884,19 +849,16 @@ def scrape_all(locations: list[str], search_terms: list[str], defaults: dict) ->
         for term in search_terms:
             i += 1
 
-            # JobSpy (Indeed): per city × per term
             print(f"  ({i}/{total}) JobSpy:", end=" ")
             result = run_search(term, loc, defaults)
             if result is not None:
                 all_dfs.append(result)
 
-            # Seek + LinkedIn: per city × per term
             print("           AU:", end=" ")
             au_jobs = scrape_au_sites(term, city)
             if au_jobs:
                 all_dfs.append(pd.DataFrame(au_jobs))
 
-    # ── National sources (called once per search term, not per city) ──────
     print("\n  [Prosple - national]")
     for j, term in enumerate(search_terms, 1):
         print(f"  ({j}/{len(search_terms)}) Prosple: {term}...", end=" ", flush=True)
@@ -905,7 +867,6 @@ def scrape_all(locations: list[str], search_terms: list[str], defaults: dict) ->
         if prosple_jobs:
             all_dfs.append(pd.DataFrame(prosple_jobs))
 
-    # ── Remote-only pass: JobSpy with is_remote ───────────────────────────
     print("\n  [Remote]")
     for j, term in enumerate(search_terms, 1):
         print(f"  ({j}/{len(search_terms)}) Remote JobSpy: {term}...", end=" ", flush=True)
@@ -920,6 +881,9 @@ def scrape_all(locations: list[str], search_terms: list[str], defaults: dict) ->
             "is_remote": True,
             "verbose": 0,
         }
+        if defaults.get("proxies"):
+            remote_kwargs["proxies"] = defaults["proxies"]
+
         try:
             remote_jobs = scrape_jobs(**remote_kwargs)
             if not remote_jobs.empty:
@@ -1029,11 +993,15 @@ def main():
     hours_old = args.hours if args.hours is not None else profile_data["max_hours"]
     results_wanted = args.results if args.results is not None else profile_data["results_per_search"]
 
+    # Fetch proxies dynamically during runtime execution
+    proxies = get_free_proxies()
+
     defaults = {
         "sites": args.sites,
         "results_wanted": results_wanted,
         "hours_old": hours_old,
         "job_type": args.job_type,
+        "proxies": proxies,
     }
 
     # 3. Scrape
