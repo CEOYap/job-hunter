@@ -23,9 +23,22 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
+import os
 from jobspy import scrape_jobs
 
 from scrapers_au import close_seek_browser, scrape_au_sites, scrape_gradconnection, scrape_prosple
+
+# Fetch your proxy from the environment variable
+proxy = os.environ.get("PROXY_URL") 
+proxies = [proxy] if proxy else None
+
+jobs = scrape_jobs(
+    site_name=["seek", "linkedin"],
+    search_term="software engineer",
+    location="Sydney, Australia",
+    results_wanted=20,
+    proxies=proxies # Pass the proxy array here
+)
 
 # Suppress noisy JobSpy/tls_client logs
 logging.getLogger("JobSpy").setLevel(logging.WARNING)
