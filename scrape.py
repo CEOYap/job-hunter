@@ -175,7 +175,7 @@ def get_free_proxies():
         response = requests.get(url, timeout=10)
         if response.status_code == 200:
             # Split the text by newlines and remove any empty lines
-            proxy_list = [line.strip() for line in response.text.strip().split('\n') if line.strip()]
+            proxy_list = [line.strip() for line in response.text.strip().split("\n") if line.strip()]
             print(f"Successfully loaded {len(proxy_list)} free proxies.")
             return proxy_list
     except Exception as e:
