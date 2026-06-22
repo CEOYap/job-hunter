@@ -1,8 +1,8 @@
-name: Daily Jobs
+name: Weekly Jobs
 
 on:
   schedule:
-    - cron: '0 21 * * *'
+    - cron: '0 21 * * 0' # 0 = Sunday (Runs Monday morning local time)
   workflow_dispatch:
     inputs:
       full_run:
@@ -17,7 +17,7 @@ on:
         type: string
 
 concurrency:
-  group: daily-jobs
+  group: weekly-jobs
   cancel-in-progress: false
 
 jobs:
